@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Plugin Name: ACF to WP API
  * Description: Puts all ACF fields from posts, pages, custom post types, attachments and taxonomy terms, into the WP-API output under the 'acf' key
@@ -222,7 +223,7 @@ class ACFtoWPAPI {
 	        'acf',
 	        array(
 	            'get_callback'    => array( $this, 'addACFDataPostV2cb' ),
-	            'update_callback' => null,
+	            'update_callback' => array( $this, 'updateACFDataPostV2cb' ),
 	            'schema'          => null,
 	        )
 	    );
@@ -232,7 +233,7 @@ class ACFtoWPAPI {
 	        'acf',
 	        array(
 	            'get_callback'    => array( $this, 'addACFDataPostV2cb' ),
-	            'update_callback' => null,
+	            'update_callback' => array( $this, 'updateACFDataPostV2cb' ),
 	            'schema'          => null,
 	        )
 	    );
@@ -247,7 +248,7 @@ class ACFtoWPAPI {
 		        'acf',
 		        array(
 		            'get_callback'    => array( $this, 'addACFDataPostV2cb' ),
-		            'update_callback' => null,
+		            'update_callback' => array( $this, 'updateACFDataPostV2cb' ),
 		            'schema'          => null,
 		        )
 		    );
@@ -270,7 +271,9 @@ class ACFtoWPAPI {
 	 * @since 1.3.0
 	 */
 	function addACFDataPostV2cb($object, $fieldName, $request) {
-		return $this->_getData($object['id']);
+		$array = $this->_getData($object['id']);
+		unset($array[""]); // don't pass elements with empty keys
+		return $array;
 	}
 
 	/**
@@ -538,6 +541,46 @@ class ACFtoWPAPI {
 		return $routes;
 	}
 
+	/**
+	 * Handler for updating custom field data.
+	 *
+	 * @author Simon Heys <simon@makeandship.co.uk>
+	 *
+	 * @param mixed $fields An array of ACF field labels and values
+	 * @param object $object The post object
+	 * @param string $field_name 'acf'
+	 *
+	 * @return bool|int
+	 */
+	function updateACFDataPostV2cb($fields, $object, $field_name) {
+    	$post_id = $object->ID;
+    	foreach ($fields as $field_name => $value) {
+    		$field_key = $this->get_acf_key($field_name);
+    		update_field($field_key, $value, $post_id);
+    	}
+		return true;
+	}
+
+	/**
+	 * Convert nice label into acf key
+	 *
+	 * @author http://stackoverflow.com/a/34923462
+	 *
+	 * @param string $field_name nice label such as 'custom_text_field'
+	 *
+	 * @return string acf key such as 'field_56bef01566fd3'
+	 */
+	
+	function get_acf_key($field_name) {
+		global $wpdb;
+		$length = strlen($field_name);
+		$sql = "
+			SELECT `meta_key`
+			FROM {$wpdb->postmeta}
+			WHERE `meta_key` LIKE 'field_%' AND `meta_value` LIKE '%\"name\";s:$length:\"$field_name\";%';
+		";
+		return $wpdb->get_var($sql);
+	}
 }
 
 $ACFtoWPAPI = new ACFtoWPAPI();
