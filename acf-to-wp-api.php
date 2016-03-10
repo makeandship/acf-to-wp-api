@@ -555,7 +555,7 @@ class ACFtoWPAPI {
 	function updateACFDataPostV2cb($fields, $object, $field_name) {
     	$post_id = $object->ID;
     	foreach ($fields as $field_name => $value) {
-    		$field_key = $this->get_acf_key($field_name);
+    		$field_key = $this->get_acf_key($field_name, $post_id);
     		update_field($field_key, $value, $post_id);
     	}
 		return true;
@@ -571,16 +571,14 @@ class ACFtoWPAPI {
 	 * @return string acf key such as 'field_56bef01566fd3'
 	 */
 	
-	function get_acf_key($field_name) {
-		global $wpdb;
-		$length = strlen($field_name);
-		$sql = "
-			SELECT `meta_key`
-			FROM {$wpdb->postmeta}
-			WHERE `meta_key` LIKE 'field_%' AND `meta_value` LIKE '%\"name\";s:$length:\"$field_name\";%';
-		";
-		return $wpdb->get_var($sql);
+	function get_acf_key($field_name, $post_id) {
+		$field = _acf_get_field_by_name($field_name);
+		if ( $field ) {
+			$key = $field['key'];
+		}
+		return $key;
 	}
+
 }
 
 $ACFtoWPAPI = new ACFtoWPAPI();
