@@ -272,7 +272,7 @@ class ACFtoWPAPI {
 	 */
 	function addACFDataPostV2cb($object, $fieldName, $request) {
 		$array = $this->_getData($object['id']);
-		unset($array[""]); // don't pass elements with empty keys
+		$array = $this->_non_empty_items($array);
 		return $array;
 	}
 
@@ -555,8 +555,18 @@ class ACFtoWPAPI {
 	function updateACFDataPostV2cb($fields, $object, $field_name) {
     	$post_id = $object->ID;
     	foreach ($fields as $field_name => $value) {
-    		$field_key = $this->get_acf_key($field_name, $post_id);
-    		update_field($field_key, $value, $post_id);
+    		$field = $this->acf_get_field_by_name($field_name);
+    		if ( isset($field['key'])) {
+	    		$field_key = $field['key'];
+	    		if ( $field['type'] =='true_false' && is_string($value)) {
+	    			// update with '1' or 'true' for true
+	    			$value = strtolower($value);
+	    			update_field($field_key, $value === 'true' || $value === '1', $post_id);
+	    		}
+	    		else {
+	    			update_field($field_key, $value, $post_id);
+	    		}
+    		}
     	}
 		return true;
 	}
@@ -572,12 +582,57 @@ class ACFtoWPAPI {
 	 */
 	
 	function get_acf_key($field_name, $post_id) {
-		$field = _acf_get_field_by_name($field_name);
+		$field = $this->acf_get_field_by_name($field_name);
 		if ( $field ) {
 			$key = $field['key'];
+			return $key;
 		}
-		return $key;
+		echo("Couldn't find field for name ".$field_name);
+		return false;
 	}
+
+	function acf_get_field_by_name( $name = '', $db_only = false ) {
+		
+		$args = array(
+			'posts_per_page'	=> 0,
+			'post_type'			=> 'acf-field',
+			'orderby' 			=> 'menu_order title',
+			'order'				=> 'ASC',
+			'suppress_filters'	=> false,
+			'acf_field_name'	=> $name
+		);
+
+		// load posts
+		$posts = get_posts( $args );
+
+		// return first one that is not a tab
+		foreach($posts as $post) {
+			$field = _acf_get_field_by_id($post->ID, $db_only);
+			if ( $field['type'] !== 'tab') {
+				return $field;
+			}
+		}
+	}
+
+	private function _non_empty_items($input) {
+	    // If it is an element, then just return it
+	    if (!is_array($input)) {
+	      return $input;
+	    }
+	    $non_empty_items = array();
+
+	    foreach ($input as $key => $value) {
+	      // Ignore empty cells
+	      if($value) {
+	        // Use recursion to evaluate cells 
+	        $non_empty_items[$key] = $this->_non_empty_items($value);
+	      }
+	    }
+
+	    // Finally return the array without empty items
+	    return $non_empty_items;
+	}
+
 
 }
 
