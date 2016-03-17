@@ -1,5 +1,6 @@
 <?php
 
+
 /**
  * Plugin Name: ACF to WP API
  * Description: Puts all ACF fields from posts, pages, custom post types, attachments and taxonomy terms, into the WP-API output under the 'acf' key
@@ -106,6 +107,9 @@ class ACFtoWPAPI {
 		add_action( 'rest_api_init', array( $this, 'addACFDataCommentV2' ) ); // Comments
 
 		add_action( 'rest_api_init', array( $this, 'addACFOptionRouteV2') );
+
+		// intercept updating true_false field to accept values passed as strings
+		add_filter('acf/update_value/type=true_false', array($this, 'acf_update_value_true_false'), 10, 3);
 	}
 
 	/**
@@ -558,38 +562,19 @@ class ACFtoWPAPI {
     		$field = $this->acf_get_field_by_name($field_name);
     		if ( isset($field['key'])) {
 	    		$field_key = $field['key'];
-	    		if ( $field['type'] =='true_false' && is_string($value)) {
-	    			// update with '1' or 'true' for true
-	    			$value = strtolower($value);
-	    			update_field($field_key, $value === 'true' || $value === '1', $post_id);
-	    		}
-	    		else {
-	    			update_field($field_key, $value, $post_id);
-	    		}
+    			update_field($field_key, $value, $post_id);
     		}
     	}
 		return true;
 	}
 
 	/**
-	 * Convert nice label into acf key
+	 * Get acf filed from nice label
 	 *
-	 * @author http://stackoverflow.com/a/34923462
+	 * @param string $name nice label such as 'custom_text_field'
 	 *
-	 * @param string $field_name nice label such as 'custom_text_field'
-	 *
-	 * @return string acf key such as 'field_56bef01566fd3'
+	 * @return object acf field including key such as 'field_56bef01566fd3'
 	 */
-	
-	function get_acf_key($field_name, $post_id) {
-		$field = $this->acf_get_field_by_name($field_name);
-		if ( $field ) {
-			$key = $field['key'];
-			return $key;
-		}
-		echo("Couldn't find field for name ".$field_name);
-		return false;
-	}
 
 	function acf_get_field_by_name( $name = '', $db_only = false ) {
 		
@@ -633,6 +618,14 @@ class ACFtoWPAPI {
 	    return $non_empty_items;
 	}
 
+	function acf_update_value_true_false( $value, $post_id, $field  ) {
+		if (is_string($value)) {
+			// update with '1' or 'true' for true
+			$value = strtolower($value);
+			$value = ($value === 'true' || $value === '1');
+		}
+	    return $value;
+	}
 
 }
 
